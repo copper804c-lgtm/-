@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+    <rect width="512" height="512" fill="#ffcccc" rx="100" />
+    <text x="256" y="270" font-size="200" text-anchor="middle" dominant-baseline="central">❤️</text>
+    <text x="256" y="420" font-size="60" font-family="sans-serif" text-anchor="middle" fill="#d9534f" font-weight="bold">塩分血圧</text>
+</svg>

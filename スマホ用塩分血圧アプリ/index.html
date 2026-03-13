@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>塩分・血圧管理</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff6666">
+<link rel="apple-touch-icon" href="icon.svg">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    body{font-family:sans-serif;padding:20px;line-height:1.6;}
+    input,button{margin:5px;padding:8px;border-radius:5px;border:1px solid #ccc;}
+    select{margin:5px;padding:8px;border-radius:5px;border:1px solid #ccc;max-width:90%;}
+    button{background-color: #f0f0f0; cursor: pointer;}
+    button:hover{background-color: #e0e0e0;}
+    .section{margin-top:20px;padding:15px;border:1px solid #ccc;border-radius:10px;}
+    .item{border-bottom:1px solid #ddd;margin-bottom:10px;padding:10px;}
+    .total-salt{font-weight:bold;color: #d9534f;}
+    #graph{overflow-x: auto; margin-top: 10px;}
+    #mealList, #vitalList { display: none; margin-top: 10px; }
+    @media print{body{width:210mm;}}
+</style>
+</head>
+<body>
+
+<h2>塩分・血圧管理アプリ</h2>
+
+<button onclick="toggleGuidance()" style="background-color:#5bc0de; color:white; font-weight:bold; width:100%; margin-bottom:15px;">📖 使い方・ガイダンスを見る / 閉じる</button>
+
+<div id="guidanceSection" class="section" style="display:none; background-color:#f9f9f9; border-color:#bce8f1; margin-top:0;">
+    <h3 style="color:#31708f; margin-top:0;">アプリの基本的な使い方</h3>
+    <ul>
+        <li><b>データの保存先：</b>このアプリのデータは、今開いているスマホやPCの「ブラウザ内」に直接保存されます。クラウドには送信されないため安全ですが、<b>ブラウザの履歴やキャッシュを消去するとデータも消えてしまう</b>のでご注意ください。</li>
+        <li><b>他の人への配布・共有：</b>URL（GitHub Pagesなど）を他の人に教えると、その人もアプリを使えます。ただし、データは「その人のスマホ内」に保存されるため、あなたのデータが見知らぬ人に見られることはありません。各々が自分専用として使えます。</li>
+    </ul>
+    
+    <h3 style="color:#31708f;">食事入力と食事データベース</h3>
+    <ul>
+        <li><b>初期データ（A・B・Cカテゴリ）：</b>一般的な調味料やカップ麺（Aカテゴリ）、吉野家やマクドナルドといった主要外食チェーンのメニュー（Bカテゴリ）など、約60件のデータが最初から入っています。</li>
+        <li><b>自動計算（サジェスト）：</b>食事入力の「内容」欄をタップすると登録食品リストが出ます。選ぶと基準の単位（例:100g, 1人前, 2貫など）が表示され、「摂取量」に実際のグラム数や食べた個数を入力すると、設定された基準から<b>自動で塩分が逆算・計算</b>されます。</li>
+        <li><b>1日の合計塩分：</b>入力するたびに、目標（6g以下）に対して現在何グラム摂取したかが中段の「今日の塩分メーター」に反映されます。</li>
+        <li><b>自分だけの食事を追加・管理：</b>下部の「食事データベース管理」セクションでは、よく食べる自炊メニューやお気に入りの惣菜などをカテゴリ・単位・塩分とともに登録できます。登録するとすぐ「内容」欄のサジェストに反映されます。また、既存データの呼び出し・修正・削除、および登録全データの一覧確認もここで行えます。</li>
+    </ul>
+
+    <h3 style="color:#31708f;">グラフの見方と期間指定</h3>
+    <ul>
+        <li><b>グラフの特徴：</b>折れ線グラフで毎日の「塩分摂取量(g)」を、棒グラフ（青と赤）で「朝・夕の血圧(mmHg)」を表示します。これにより、<b>「塩分の多い食事をした翌日に血圧がどう変化するか」などの相関関係を視覚的にチェック</b>できます。</li>
+        <li><b>期間のカスタマイズ：</b>最初は直近2週間が表示されますが、グラフ上部の「期間」で開始日と終了日を選び「表示更新」を押すことで、任意の期間（数日〜最大100日間まで）のデータを一覧表示できます。自分の見やすい期間に調整して活用してください。</li>
+    </ul>
+
+    <h3 style="color:#31708f;">テストデータについて（一番下の青いボタン）</h3>
+    <ul>
+        <li>初めて使う際に動きを確かめるためのボタンです。押すと、過去3週間分の「朝昼晩の食事」と「朝夕の血圧」の架空データが自動入力され、グラフがどんな風に表示されるかをシミュレーションできます。</li>
+        <li><b>注意：</b>現在のデータに混ざって追加されるため、本番運用中には押さないことをお勧めします。（もし押してしまった場合は「⚠ 全データ削除」をする必要があります）</li>
+    </ul>
+</div>
+
+<div class="section">
+    <h3>食事入力</h3>
+    日付:<input type="date" id="mealDate">
+    <button onclick="loadMeal()">データを呼出</button><br>
+    <select id="mealSelect" style="display:none;" onchange="selectMeal()"></select><br id="mealSelectBr" style="display:none;">
+    内容:<input type="text" id="mealDesc" placeholder="例：朝食 焼き魚セット" list="foodList" oninput="calculateSalt()" style="width:150px;">
+    <datalist id="foodList"></datalist>
+    <div style="display:inline-block; font-size:0.9em; color:#666;" id="mealUnitHint"></div>
+    <input type="hidden" id="mealId"><br>
+    摂取量:<input type="number" step="0.1" id="mealAmount" value="1" oninput="calculateSalt()" style="width:60px;">
+    塩分(g):<input type="number" step="0.1" id="salt" style="width:60px;"><br>
+    <button onclick="saveMeal()" style="background:#dff0d8;">保存/追加</button>
+    <button onclick="deleteCurrentMeal()" style="background:#f2dede;">削除</button>
+    <button onclick="toggleMeals()">一覧表示/非表示</button>
+    <div id="mealList"></div>
+
+    <hr>
+    <h3>今日の塩分メーター (目標6g以下)</h3>
+    <div style="width:100%;background:#ddd;height:25px;border-radius:10px;margin-bottom:5px;">
+        <div id="saltBar" style="height:25px;width:0%;background:#337ab7;border-radius:10px;transition: width 0.5s, background-color 0.5s;"></div>
+    </div>
+    <div id="saltText" style="font-weight:bold;"></div>
+</div>
+
+<div class="section">
+    <h3>血圧・体重入力</h3>
+    日付:<input type="date" id="vitalDate">
+    <button onclick="loadVital()">データを呼出</button><br>
+    朝 上:<input type="number" id="amHigh" placeholder="最高">
+    朝 下:<input type="number" id="amLow" placeholder="最低"><br>
+    夕 上:<input type="number" id="pmHigh" placeholder="最高">
+    夕 下:<input type="number" id="pmLow" placeholder="最低"><br>
+    体重:<input type="number" step="0.1" id="weight" placeholder="kg"><br>
+    <button onclick="saveVital()" style="background:#dff0d8;">保存/更新</button>
+    <button onclick="deleteCurrentVital()" style="background:#f2dede;">削除</button>
+    <button onclick="toggleVitals()">一覧表示/非表示</button>
+    
+    <div id="vitalList"></div>
+
+    <hr>
+    <h3>血圧・塩分グラフ</h3>
+    <div>
+        期間: <input type="date" id="graphStartDate"> 〜 <input type="date" id="graphEndDate">
+        <button onclick="updateGraphRange()">表示更新</button>
+    </div>
+    <div id="graph" style="position: relative; height: 350px; width: 100%;">
+        <canvas id="graphCanvas"></canvas>
+    </div>
+</div>
+
+<div class="section">
+    <h3>食事データベース管理</h3>
+    <button onclick="loadFoodListForSelect()">データベースから呼出</button><br>
+    <select id="foodSelect" style="display:none;" onchange="selectFood()"></select><br id="foodSelectBr" style="display:none;">
+    
+    カテゴリ:<input type="text" id="foodCategory" placeholder="例：A 材料商品" list="categoryList" style="width:120px;">
+    <datalist id="categoryList">
+        <option value="A 材料商品">
+        <option value="B 外食">
+        <option value="C 中食・惣菜">
+    </datalist><br>
+    商品・品目名:<input type="text" id="foodName" placeholder="例：醤油ラーメン" style="width:200px;"><br>
+    単位:<input type="text" id="foodUnit" placeholder="例：100g, 1人前" style="width:100px;"><br>
+    塩分(g):<input type="number" step="0.1" id="foodSalt" style="width:80px;"><br>
+    備考:<input type="text" id="foodMemo" placeholder="補足情報" style="width:200px;"><br>
+    <input type="hidden" id="foodId">
+    
+    <button onclick="saveFood()" style="background:#dff0d8;">保存/追加</button>
+    <button onclick="deleteFood()" style="background:#f2dede;">削除</button>
+    <button onclick="toggleFoodDatabase()">一覧表示/非表示</button>
+    
+    <div id="foodDatabaseList" style="display:none; margin-top:10px;"></div>
+</div>
+
+<div class="section" style="border-color: #ebccd1;">
+    <button onclick="clearAll()" style="color:red;">⚠ 全データ削除</button>
+    <button onclick="injectTestData()" style="color:blue;">🧪 3週間分のテストデータを入れる</button>
+</div>
+
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+        navigator.serviceWorker.register('sw.js');
+    });
+}
+
+// --- [0] 食事データベースの初期化と管理 ---
+const initialFoodData = [
+    { category: "A 材料商品", name: "ラーメンスープ（液体・濃縮）", unit: "100g", salt: 12.5, memo: "平均的な市販品" },
+    { category: "A 材料商品", name: "ラーメンスープ（粉末）", unit: "100g", salt: 45, memo: "希釈して使用" },
+    { category: "A 材料商品", name: "ラーメン乾麺（かんすい含む）", unit: "100g", salt: 1.5, memo: "茹でる前の数値" },
+    { category: "A 材料商品", name: "カレールー（固形・中辛）", unit: "100g", salt: 10.2, memo: "1皿分は約2.0g" },
+    { category: "A 材料商品", name: "炊き込みご飯の素（液状）", unit: "100g", salt: 11, memo: "3合炊き用パック参照" },
+    { category: "A 材料商品", name: "チャーハンの素（粉末）", unit: "100g", salt: 35, memo: "1人前は約2.5g" },
+    { category: "A 材料商品", name: "コンソメ（固形）", unit: "100g", salt: 48, memo: "1個(5g)あたり2.4g" },
+    { category: "A 材料商品", name: "鶏ガラスープの素", unit: "100g", salt: 42, memo: "スプーン1杯で約1.8g" },
+    { category: "A 材料商品", name: "めんつゆ（3倍濃縮）", unit: "100g", salt: 11.5, memo: "" },
+    { category: "A 材料商品", name: "ウスターソース", unit: "100g", salt: 8.4, memo: "" },
+    { category: "A 材料商品", name: "濃口醤油", unit: "100g", salt: 14.5, memo: "" },
+    { category: "A 材料商品", name: "薄口醤油", unit: "100g", salt: 16, memo: "実は濃口より高い" },
+    { category: "A 材料商品", name: "味噌（米味噌）", unit: "100g", salt: 12, memo: "" },
+    { category: "A 材料商品", name: "マヨネーズ", unit: "100g", salt: 1.9, memo: "比較的低め" },
+    { category: "A 材料商品", name: "ケチャップ", unit: "100g", salt: 3.3, memo: "" },
+    { category: "A 材料商品", name: "焼肉のたれ", unit: "100g", salt: 6.5, memo: "" },
+    { category: "A 材料商品", name: "ドレッシング（和風）", unit: "100g", salt: 5.5, memo: "" },
+    { category: "A 材料商品", name: "パスタソース（ミートソース）", unit: "100g", salt: 2.2, memo: "" },
+    { category: "A 材料商品", name: "麻婆豆腐の素", unit: "100g", salt: 6.8, memo: "" },
+    { category: "A 材料商品", name: "豆板醤", unit: "100g", salt: 15, memo: "" },
+    { category: "A 材料商品", name: "粒入りマスタード", unit: "100g", salt: 4, memo: "" },
+    { category: "A 材料商品", name: "白だし", unit: "100g", salt: 10.5, memo: "" },
+    { category: "A 材料商品", name: "永谷園 お茶づけ海苔", unit: "100g", salt: 40, memo: "1袋(6g)あたり2.4g" },
+    { category: "A 材料商品", name: "ふりかけ（のりたま等）", unit: "100g", salt: 9, memo: "" },
+    { category: "A 材料商品", name: "塩昆布", unit: "100g", salt: 18, memo: "" },
+    { category: "A 材料商品", name: "梅干し（塩漬け）", unit: "100g", salt: 20, memo: "" },
+    { category: "A 材料商品", name: "スライスチーズ", unit: "100g", salt: 2.8, memo: "1枚あたり約0.4g" },
+    { category: "A 材料商品", name: "ハム（ロース）", unit: "100g", salt: 2.5, memo: "" },
+    { category: "A 材料商品", name: "ウインナーソーセージ", unit: "100g", salt: 1.9, memo: "" },
+    { category: "A 材料商品", name: "ベーコン", unit: "100g", salt: 2, memo: "" },
+    { category: "A 材料商品", name: "かまぼこ", unit: "100g", salt: 2.5, memo: "" },
+    { category: "A 材料商品", name: "ちくわ", unit: "100g", salt: 2.1, memo: "" },
+    { category: "A 材料商品", name: "魚肉ソーセージ", unit: "100g", salt: 1.7, memo: "" },
+    { category: "A 材料商品", name: "ツナ缶（油漬け）", unit: "100g", salt: 0.7, memo: "" },
+    { category: "A 材料商品", name: "カップヌードル（標準）", unit: "100g", salt: 5, memo: "製品1個分に相当" },
+    { category: "A 材料商品", name: "即席袋麺（醤油）", unit: "100g", salt: 5.8, memo: "" },
+    { category: "A 材料商品", name: "冷凍チャーハン", unit: "100g", salt: 1.3, memo: "1袋(450g)食べると5.8g" },
+    { category: "A 材料商品", name: "冷凍餃子", unit: "100g", salt: 1.1, memo: "" },
+    { category: "A 材料商品", name: "冷凍たこ焼き", unit: "100g", salt: 1.2, memo: "" },
+    { category: "A 材料商品", name: "インスタント味噌汁（生味噌）", unit: "100g", salt: 10, memo: "1食あたり約1.9g" },
+    { category: "A 材料商品", name: "ほんだし", unit: "100g", salt: 40, memo: "" },
+    { category: "A 材料商品", name: "豆乳（調整）", unit: "100g", salt: 0.2, memo: "" },
+    { category: "A 材料商品", name: "牛乳", unit: "100g", salt: 0.1, memo: "" },
+    { category: "A 材料商品", name: "食パン", unit: "100g", salt: 1.3, memo: "6枚切り1枚で約0.8g" },
+    { category: "A 材料商品", name: "バター（有塩）", unit: "100g", salt: 1.9, memo: "" },
+    { category: "A 材料商品", name: "マーガリン", unit: "100g", salt: 1.3, memo: "" },
+    { category: "A 材料商品", name: "オイスターソース", unit: "100g", salt: 12, memo: "" },
+    { category: "A 材料商品", name: "柚子胡椒", unit: "100g", salt: 20, memo: "" },
+    { category: "A 材料商品", name: "キムチ", unit: "100g", salt: 2.9, memo: "" },
+    { category: "A 材料商品", name: "メンマ（味付き）", unit: "100g", salt: 3, memo: "" },
+    { category: "B 外食：吉野家", name: "牛丼（並盛）", unit: "1人前", salt: 2.7, memo: "" },
+    { category: "B 外食：吉野家", name: "豚丼（並盛）", unit: "1人前", salt: 2.6, memo: "" },
+    { category: "B 外食：吉野家", name: "牛焼肉定食", unit: "1人前", salt: 5.3, memo: "味噌汁・お新香含む" },
+    { category: "B 外食：吉野家", name: "鉄板牛カルビ定食", unit: "1人前", salt: 4.8, memo: "" },
+    { category: "B 外食：吉野家", name: "お新香", unit: "1人前", salt: 1.5, memo: "" },
+    { category: "B 外食：ジョナサン", name: "タンドリーチキン＆メキシカンピラフ", unit: "1人前", salt: 6.8, memo: "人気メニュー" },
+    { category: "B 外食：ジョナサン", name: "和風おろしハンバーグ", unit: "1人前", salt: 4.2, memo: "" },
+    { category: "B 外食：ジョナサン", name: "豪州産タスマニアビーフ100%ハンバーグ", unit: "1人前", salt: 3.5, memo: "" },
+    { category: "B 外食：ジョナサン", name: "イタリアンホットサンド", unit: "1人前", salt: 3.2, memo: "" },
+    { category: "B 外食：ジョナサン", name: "盛岡冷麺", unit: "1人前", salt: 8.5, memo: "スープ完飲の場合" },
+    { category: "B 外食：ﾏｸﾄﾞﾅﾙﾄﾞ", name: "ビッグマック", unit: "1人前", salt: 2.6, memo: "" },
+    { category: "B 外食：ﾏｸﾄﾞﾅﾙﾄﾞ", name: "照り焼きマックバーガー", unit: "1人前", salt: 2.2, memo: "" },
+    { category: "B 外食：ﾏｸﾄﾞﾅﾙﾄﾞ", name: "フィレオフィッシュ", unit: "1人前", salt: 1.2, memo: "意外と低め" },
+    { category: "B 外食：ﾏｸﾄﾞﾅﾙﾄﾞ", name: "マックフライポテト(M)", unit: "1人前", salt: 0.8, memo: "" },
+    { category: "B 外食：ﾏｸﾄﾞﾅﾙﾄﾞ", name: "チキンマックナゲット(5P)", unit: "1人前", salt: 1.3, memo: "ソース含まず" },
+    { category: "B 外食：餃子の王将", name: "餃子（1枚6個）", unit: "1人前", salt: 1.1, memo: "タレ含まず" },
+    { category: "B 外食：餃子の王将", name: "炒飯", unit: "1人前", salt: 4.9, memo: "" },
+    { category: "B 外食：餃子の王将", name: "王将ラーメン", unit: "1人前", salt: 7, memo: "" },
+    { category: "B 外食：餃子の王将", name: "鶏の唐揚", unit: "1人前", salt: 3.2, memo: "" },
+    { category: "B 外食：餃子の王将", name: "天津飯（甘酢）", unit: "1人前", salt: 5.5, memo: "" },
+    { category: "B 外食：すき家", name: "牛丼（並盛）", unit: "1人前", salt: 2.5, memo: "" },
+    { category: "B 外食：すき家", name: "カレー（並盛）", unit: "1人前", salt: 6.5, memo: "" },
+    { category: "B 外食：すき家", name: "とろ〜り3種のチーズ牛丼", unit: "1人前", salt: 3.2, memo: "" },
+    { category: "B 外食：松屋", name: "牛めし（並盛）", unit: "1人前", salt: 2.1, memo: "味噌汁抜き数値" },
+    { category: "B 外食：松屋", name: "富士山豆腐の本格麻婆めし", unit: "1人前", salt: 5.2, memo: "" },
+    { category: "B 外食：松屋", name: "豚汁", unit: "1人前", salt: 3.5, memo: "" },
+    { category: "B 外食：ｻｲｾﾞﾘﾔ", name: "ミラノ風ドリア", unit: "1人前", salt: 2.3, memo: "" },
+    { category: "B 外食：ｻｲｾﾞﾘﾔ", name: "辛味チキン", unit: "1人前", salt: 1.5, memo: "" },
+    { category: "B 外食：ｻｲｾﾞﾘﾔ", name: "マルゲリータピザ", unit: "1人前", salt: 2.8, memo: "" },
+    { category: "B 外食：丸亀製麺", name: "ぶっかけうどん（並・温）", unit: "1人前", salt: 3.4, memo: "" },
+    { category: "B 外食：丸亀製麺", name: "釜揚げうどん（並）", unit: "1人前", salt: 3.3, memo: "つゆを含む" },
+    { category: "B 外食：丸亀製麺", name: "かしわ天", unit: "1個", salt: 0.6, memo: "" },
+    { category: "B 外食：ｺｺｲﾁ", name: "ポークカレー（普通）", unit: "1人前", salt: 3.3, memo: "" },
+    { category: "B 外食：ｺｺｲﾁ", name: "ロースカツカレー", unit: "1人前", salt: 4.1, memo: "" },
+    { category: "B 外食：大戸屋", name: "鶏と野菜の黒酢あん定食", unit: "1人前", salt: 4.9, memo: "味噌汁等含む" },
+    { category: "B 外食：大戸屋", name: "ほっけの炭火焼き定食", unit: "1人前", salt: 6.2, memo: "醤油・味噌汁含む" },
+    { category: "B 外食：ガスト", name: "チーズINハンバーグ", unit: "1人前", salt: 3.1, memo: "" },
+    { category: "B 外食：ガスト", name: "たっぷりマヨコーンピザ", unit: "1人前", salt: 3.8, memo: "" },
+    { category: "B 外食：てんや", name: "天丼", unit: "1人前", salt: 3.2, memo: "味噌汁含む" },
+    { category: "B 外食：はなまるうどん", name: "きつねうどん（中）", unit: "1人前", salt: 6.1, memo: "" },
+    { category: "B 外食：ﾓｽﾊﾞｰｶﾞｰ", name: "モスバーガー", unit: "1人前", salt: 2.3, memo: "" },
+    { category: "B 外食：ﾓｽﾊﾞｰｶﾞｰ", name: "テリヤキバーガー", unit: "1人前", salt: 2.4, memo: "" },
+    { category: "B 外食：KFC", name: "オリジナルチキン", unit: "1ピース", salt: 1.7, memo: "" },
+    { category: "B 外食：KFC", name: "チキンフィレバーガー", unit: "1人前", salt: 2.4, memo: "" },
+    { category: "B 外食：くら寿司", name: "熟成まぐろ", unit: "2貫", salt: 0.1, memo: "醤油含まず" },
+    { category: "B 外食：くら寿司", name: "特製茶碗蒸し", unit: "1人前", salt: 1.4, memo: "" },
+    { category: "B 外食：ﾐｽﾀｰﾄﾞｰﾅﾂ", name: "ポン・デ・リング", unit: "1個", salt: 0.6, memo: "" },
+    { category: "B 外食：ﾐｽﾀｰﾄﾞｰﾅﾂ", name: "オールドファッション", unit: "1個", salt: 0.7, memo: "" },
+    { category: "B 外食：CoCo壱番屋", name: "海老カツカレー", unit: "1人前", salt: 4.2, memo: "" },
+    { category: "B 外食：富士そば", name: "かけそば", unit: "1人前", salt: 5.2, memo: "" }
+];
+
+function initFoodDatabase() {
+    let db = localStorage.getItem("foodDatabase");
+    if (!db) {
+        // IDを付与して保存
+        let initialDataWithId = initialFoodData.map((item, index) => {
+            return {
+                id: "food_" + new Date().getTime() + "_" + index,
+                ...item
+            };
+        });
+        localStorage.setItem("foodDatabase", JSON.stringify(initialDataWithId));
+    }
+}
+
+function updateFoodDatalist() {
+    let db = JSON.parse(localStorage.getItem("foodDatabase")) || [];
+    let datalist = document.getElementById("foodList");
+    if (!datalist) return;
+    
+    let html = "";
+    db.forEach(f => {
+        html += `<option value="${f.name}">${f.category} [${f.unit}: ${f.salt}g]</option>`;
+    });
+    datalist.innerHTML = html;
+}
+
+// 初期化実行
+initFoodDatabase();
+
+// --- [1] 食事データの操作 ---
+
+// グローバル変数で直前に選択した食品名を記憶
+let lastMealDesc = "";
+
+function clearMealInput() {
+    document.getElementById("mealDesc").value = "";
+    document.getElementById("mealAmount").value = "1";
+    document.getElementById("mealUnitHint").innerText = "";
+    document.getElementById("salt").value = "";
+    document.getElementById("mealId").value = "";
+    lastMealDesc = "";
+}
+
+function calculateSalt() {
+    let desc = document.getElementById("mealDesc").value;
+    let amountStr = document.getElementById("mealAmount").value;
+    let hint = document.getElementById("mealUnitHint");
+    
+    let db = JSON.parse(localStorage.getItem("foodDatabase")) || [];
+    let food = db.find(f => f.name === desc);
+    
+    if (food) {
+        // 単位から数値を抽出（"100g" -> 100, "1人前" -> 1, "2貫" -> 2）
+        let match = food.unit.match(/^([0-9.]+)/);
+        let baseAmount = match ? parseFloat(match[1]) : 1;
+        let unitLabel = food.unit.replace(/^[0-9.]+/, ''); // "g" や "人前" や "貫"
+        
+        // 別の食品が選択されたら、amount を基準値(baseAmount)にセットする
+        if (desc !== lastMealDesc) {
+            document.getElementById("mealAmount").value = baseAmount;
+            amountStr = baseAmount;
+        }
+        
+        let currentAmount = parseFloat(amountStr) || 0;
+        hint.innerText = `単位: ${unitLabel} (基準: ${food.unit}で塩分${food.salt}g)`;
+        
+        // （基準塩分 / 基準の量）× 入力された実質量
+        let calcSalt = (parseFloat(food.salt) / baseAmount) * currentAmount;
+        document.getElementById("salt").value = calcSalt.toFixed(1);
+        
+        lastMealDesc = desc;
+    } else {
+        hint.innerText = "";
+        lastMealDesc = desc; // 未知の食品や入力中のテキスト
+    }
+}
+
+// --- [0.1] ガイダンスの開閉 ---
+function toggleGuidance() {
+    const section = document.getElementById("guidanceSection");
+    if (section.style.display === "none") {
+        section.style.display = "block";
+    } else {
+        section.style.display = "none";
+    }
+}
+
+// --- [0.5] 食事データベース管理の操作 ---
+
+function clearFoodInput() {
+    document.getElementById("foodCategory").value = "";
+    document.getElementById("foodName").value = "";
+    document.getElementById("foodUnit").value = "";
+    document.getElementById("foodSalt").value = "";
+    document.getElementById("foodMemo").value = "";
+    document.getElementById("foodId").value = "";
+}
+
+function loadFoodListForSelect() {
+    let db = JSON.parse(localStorage.getItem("foodDatabase")) || [];
+    const select = document.getElementById("foodSelect");
+    const br = document.getElementById("foodSelectBr");
+    
+    if (db.length > 0) {
+        // カテゴリ名 > 商品名 でソート
+        db.sort((a, b) => {
+            if(a.category < b.category) return -1;
+            if(a.category > b.category) return 1;
+            if(a.name < b.name) return -1;
+            if(a.name > b.name) return 1;
+            return 0;
+        });
+        
+        let optionsHtml = '<option value="">-- 新しく追加・未選択 --</option>';
+        db.forEach(f => {
+            optionsHtml += `<option value="${f.id}">【${f.category}】${f.name}</option>`;
+        });
+        select.innerHTML = optionsHtml;
+        select.style.display = "inline-block";
+        br.style.display = "inline";
+        clearFoodInput();
+    } else {
+        select.style.display = "none";
+        br.style.display = "none";
+        alert("データベースに食品が登録されていません。");
+    }
+}
+
+function selectFood() {
+    let db = JSON.parse(localStorage.getItem("foodDatabase")) || [];
+    let id = document.getElementById("foodSelect").value;
+    if(!id) {
+        clearFoodInput();
+        return;
+    }
+    let data = db.find(f => f.id === id);
+    if(data) {
+        document.getElementById("foodCategory").value = data.category || "";
+        document.getElementById("foodName").value = data.name || "";
+        document.getElementById("foodUnit").value = data.unit || "";
+        document.getElementById("foodSalt").value = data.salt || 0;
+        document.getElementById("foodMemo").value = data.memo || "";
+        document.getElementById("foodId").value = data.id;
+    }
+}
+
+function saveFood() {
+    let category = document.getElementById("foodCategory").value.trim();
+    let name = document.getElementById("foodName").value.trim();
+    let unit = document.getElementById("foodUnit").value.trim();
+    let salt = parseFloat(document.getElementById("foodSalt").value);
+    let memo = document.getElementById("foodMemo").value.trim();
+    let id = document.getElementById("foodId").value;
+    
+    if(!name) { alert("商品・品目名を入力してください。"); return; }
+    if(isNaN(salt)) { alert("塩分(g)を正しく入力してください。"); return; }
+    
+    let db = JSON.parse(localStorage.getItem("foodDatabase")) || [];
+    
+    if(id) {
+        // 更新処理
+        let idx = db.findIndex(f => f.id === id);
+        if(idx !== -1) {
+            db[idx] = { id: id, category, name, unit, salt, memo };
+            alert("データを更新しました。");
+        }
+    } else {
+        // 新規追加
+        // 同名チェック
+        if(db.some(f => f.name === name)) {
+            if(!confirm("既に同じ商品名が登録されています。追加してよろしいですか？")) return;
+        }
+        let newEntry = {
+            id: "food_" + new Date().getTime(),
+            category, name, unit, salt, memo
+        };
+        db.push(newEntry);
+        alert("データを新規追加しました。");
+    }
+    
+    localStorage.setItem("foodDatabase", JSON.stringify(db));
+    updateFoodDatalist();
+    clearFoodInput();
+    
+    // UIの更新
+    if(document.getElementById("foodSelect").style.display !== "none") {
+        loadFoodListForSelect();
+    }
+    showFoodDatabase();
+}
+
+function deleteFood() {
+    let id = document.getElementById("foodId").value;
+    if(!id) { alert("削除するデータが選択されていません。（リストから呼出してください）"); return; }
+    
+    if(!confirm("選択中の食品データをデータベースから削除しますか？\n（過去の食事記録から消えるわけではありません）")) return;
+    
+    let db = JSON.parse(localStorage.getItem("foodDatabase")) || [];
+    db = db.filter(f => f.id !== id);
+    localStorage.setItem("foodDatabase", JSON.stringify(db));
+    
+    updateFoodDatalist();
+    clearFoodInput();
+    loadFoodListForSelect();
+    showFoodDatabase();
+    alert("削除しました。");
+}
+
+function toggleFoodDatabase() {
+    const list = document.getElementById("foodDatabaseList");
+    if (list.style.display === "none" || list.style.display === "") {
+        showFoodDatabase();
+        list.style.display = "block";
+    } else {
+        list.style.display = "none";
+    }
+}
+
+function showFoodDatabase() {
+    let db = JSON.parse(localStorage.getItem("foodDatabase")) || [];
+    let listArea = document.getElementById("foodDatabaseList");
+    
+    if(db.length === 0) {
+        listArea.innerHTML = "<p>登録データがありません。</p>";
+        return;
+    }
+    
+    // カテゴリごとにグループ化
+    let grouped = {};
+    db.forEach(f => {
+        let cat = f.category || "未分類";
+        if(!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(f);
+    });
+    
+    let html = "";
+    // カテゴリ名でソート
+    Object.keys(grouped).sort().forEach(cat => {
+        html += `<div class="item" style="border: 1px solid #ddd; background: #fafafa; border-radius:8px; margin-bottom:10px;">`;
+        html += `<h4 style="margin-top:0; border-bottom: 1px solid #ccc; padding-bottom:5px;">${cat}</h4>`;
+        
+        let items = grouped[cat];
+        items.sort((a,b) => a.name.localeCompare(b.name));
+        
+        let tableHtml = `<table style="width:100%; border-collapse: collapse; font-size:0.9em;">
+            <tr style="background-color:#eee;">
+                <th style="padding:4px; border:1px solid #ccc; text-align:left;">商品・品目名</th>
+                <th style="padding:4px; border:1px solid #ccc; text-align:center;">基準単位</th>
+                <th style="padding:4px; border:1px solid #ccc; text-align:right;">塩分(g)</th>
+            </tr>`;
+            
+        items.forEach(f => {
+            let memoStr = f.memo ? `<br><span style="font-size:0.8em; color:#666;">${f.memo}</span>` : "";
+            tableHtml += `<tr>
+                <td style="padding:4px; border:1px solid #ccc;">${f.name}${memoStr}</td>
+                <td style="padding:4px; border:1px solid #ccc; text-align:center;">${f.unit}</td>
+                <td style="padding:4px; border:1px solid #ccc; text-align:right;">${parseFloat(f.salt).toFixed(1)}</td>
+            </tr>`;
+        });
+        tableHtml += `</table>`;
+        html += tableHtml + `</div>`;
+    });
+    
+    listArea.innerHTML = html;
+}
+
+function toggleMeals() {
+    const list = document.getElementById("mealList");
+    if (list.style.display === "none" || list.style.display === "") {
+        showMeals();
+        list.style.display = "block";
+    } else {
+        list.style.display = "none";
+    }
+}
+
+function loadMeal() {
+    const mealDateValue = document.getElementById("mealDate").value;
+    if(!mealDateValue) { alert("日付を選択してください"); return; }
+
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    
+    // 互換性: 過去データにIDがない場合は付与
+    let updated = false;
+    meals.forEach(m => { 
+        if(!m.id) { m.id = new Date().getTime() + Math.random(); updated = true; } 
+    });
+    if(updated) localStorage.setItem("meals", JSON.stringify(meals));
+
+    let data = meals.filter(m => m.date === mealDateValue);
+    
+    const select = document.getElementById("mealSelect");
+    const br = document.getElementById("mealSelectBr");
+    
+    // 日付変更（データ呼出）時に下部の入力項目はリセットしておく
+    clearMealInput();
+    
+    if (data.length > 0) {
+        let optionsHtml = '<option value="">-- 新しく追加する場合はこちらを選択 --</option>';
+        data.forEach(m => {
+            optionsHtml += `<option value="${m.id}">${m.desc} (${m.salt}g)</option>`;
+        });
+        select.innerHTML = optionsHtml;
+        select.style.display = "inline-block";
+        br.style.display = "inline";
+        clearMealInput();
+        alert(`${data.length}件のデータが見つかりました。\nリストから選んで修正・削除するか、そのまま内容を入力して「保存/追加」ボタンで新しく追加できます。`);
+    } else {
+        select.style.display = "none";
+        br.style.display = "none";
+        clearMealInput();
+        alert("該当する日付のデータはありません。新しく入力してください。");
+    }
+}
+
+function selectMeal() {
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    let id = document.getElementById("mealSelect").value;
+    if(!id) {
+        clearMealInput();
+        return;
+    }
+    let data = meals.find(m => m.id.toString() === id);
+    if(data) {
+        document.getElementById("mealDesc").value = data.desc;
+        lastMealDesc = data.desc;
+        
+        // DBに存在するかチェックして、摂取量を逆算して表示
+        let db = JSON.parse(localStorage.getItem("foodDatabase")) || [];
+        let food = db.find(f => f.name === data.desc);
+        
+        if(food) {
+            let match = food.unit.match(/^([0-9.]+)/);
+            let baseAmount = match ? parseFloat(match[1]) : 1;
+            let unitLabel = food.unit.replace(/^[0-9.]+/, '');
+            
+            // 保存されていた塩分 ÷ (基準塩分 / 基準量) = 前回入力したであろう重量
+            let currentAmount = (data.salt / (parseFloat(food.salt) / baseAmount));
+            // 軽く丸めておく
+            currentAmount = Math.round(currentAmount * 10) / 10;
+            
+            document.getElementById("mealAmount").value = currentAmount;
+            document.getElementById("mealUnitHint").innerText = `単位: ${unitLabel} (基準: ${food.unit}で塩分${food.salt}g)`;
+        } else {
+            document.getElementById("mealAmount").value = "1"; // 既存データが不明な場合は1
+            document.getElementById("mealUnitHint").innerText = "";
+        }
+        
+        document.getElementById("salt").value = data.salt;
+        document.getElementById("mealId").value = data.id;
+    }
+}
+
+function saveMeal() {
+    const dateVal = document.getElementById("mealDate").value;
+    const descVal = document.getElementById("mealDesc").value;
+    const saltVal = document.getElementById("salt").value;
+    const idVal = document.getElementById("mealId").value;
+    
+    if(!dateVal) { alert("日付を入れてください"); return; }
+    if(!descVal) { alert("内容を入れてください"); return; }
+    
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    
+    if (idVal) {
+        // 更新
+        let index = meals.findIndex(m => m.id.toString() === idVal);
+        if(index !== -1) {
+            meals[index].desc = descVal;
+            meals[index].salt = parseFloat(saltVal) || 0;
+            alert("更新しました");
+        }
+    } else {
+        // 新規追加
+        let newEntry = {
+            id: new Date().getTime(),
+            date: dateVal,
+            desc: descVal,
+            salt: parseFloat(saltVal) || 0
+        };
+        meals.push(newEntry);
+        alert("追加保存しました");
+    }
+    localStorage.setItem("meals", JSON.stringify(meals));
+    showMeals();
+    drawSaltMeter();
+    drawGraph();
+    
+    // 保存後はプルダウンを再読み込みしつつ、入力欄はクリアした状態にする
+    const select = document.getElementById("mealSelect");
+    if(select.style.display !== "none") {
+        loadMeal();
+    } else {
+        clearMealInput();
+    }
+}
+
+function deleteCurrentMeal() {
+    const idVal = document.getElementById("mealId").value;
+    if(!idVal) { alert("削除するデータが選択されていません。（リストから選んでください）"); return; }
+    
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    if(confirm("選択中のデータを削除しますか？")) {
+        meals = meals.filter(m => m.id.toString() !== idVal);
+        localStorage.setItem("meals", JSON.stringify(meals));
+        showMeals();
+        drawSaltMeter();
+        drawGraph();
+        
+        // 削除後に入力欄をリセットし、プルダウンを更新
+        clearMealInput();
+        const select = document.getElementById("mealSelect");
+        if(select.style.display !== "none") {
+            loadMeal();
+        }
+    }
+}
+
+function showMeals(){
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    // 互換性: id付与
+    meals.forEach(m => { if(!m.id) m.id = new Date().getTime() + Math.random(); });
+    
+    // 日付で降順ソート
+    meals.sort((a,b)=> new Date(b.date) - new Date(a.date));
+    
+    // 日付ごとにグループ化
+    let grouped = {};
+    meals.forEach(m => {
+        if(!grouped[m.date]) grouped[m.date] = [];
+        grouped[m.date].push(m);
+    });
+    
+    let html="";
+    for(let date in grouped) {
+        let total = 0;
+        html += `<div class="item" style="border: 2px solid #ddd; background: #fafafa; border-radius:8px;">`;
+        html += `<h4 style="margin-top:0; border-bottom: 2px solid #ccc; padding-bottom:5px;">${date}</h4>`;
+        grouped[date].forEach(m => {
+            total += Number(m.salt);
+            html += `<div style="padding-left:10px; margin-bottom:8px;">
+                <span style="display:inline-block; width:calc(100% - 60px);">・${m.desc} : ${m.salt}g</span>
+                <button onclick="deleteMealById('${m.id}')" style="padding:4px 8px; font-size:12px; background:#f2dede;">削</button>
+            </div>`;
+        });
+        html += `<div style="font-weight:bold; font-size:1.1em; color:#d9534f; text-align:right; margin-top:10px;">総塩分量: ${total.toFixed(1)}g</div>`;
+        html += `</div>`;
+    }
+    document.getElementById("mealList").innerHTML = html;
+}
+
+function deleteMealById(id){
+    if(!confirm("このデータを削除しますか？")) return;
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    meals = meals.filter(m => m.id.toString() !== id.toString());
+    localStorage.setItem("meals", JSON.stringify(meals));
+    showMeals();
+    drawSaltMeter();
+    drawGraph();
+    if(document.getElementById("mealId").value === id.toString()){
+        clearMealInput();
+    }
+    const select = document.getElementById("mealSelect");
+    if(select.style.display !== "none") {
+        loadMeal();
+    }
+}
+
+// --- [2] 血圧・体重データの操作 ---
+
+function clearVitalInput() {
+    document.getElementById("amHigh").value = "";
+    document.getElementById("amLow").value = "";
+    document.getElementById("pmHigh").value = "";
+    document.getElementById("pmLow").value = "";
+    document.getElementById("weight").value = "";
+}
+
+function toggleVitals() {
+    const list = document.getElementById("vitalList");
+    if (list.style.display === "none" || list.style.display === "") {
+        showVitals();
+        list.style.display = "block";
+    } else {
+        list.style.display = "none";
+    }
+}
+
+function loadVital() {
+    let vitals = JSON.parse(localStorage.getItem("vitals")) || [];
+    let dateVal = document.getElementById("vitalDate").value;
+    
+    // 日付変更（呼出）時に入力欄をリセット
+    clearVitalInput();
+    
+    let data = vitals.find(v => v.date === dateVal);
+    if (data) {
+        document.getElementById("amHigh").value = data.amHigh;
+        document.getElementById("amLow").value = data.amLow;
+        document.getElementById("pmHigh").value = data.pmHigh;
+        document.getElementById("pmLow").value = data.pmLow;
+        document.getElementById("weight").value = data.weight;
+        alert("読み込み完了");
+    } else {
+        alert("データなし。新規入力してください。");
+    }
+}
+
+function saveVital() {
+    let dateVal = document.getElementById("vitalDate").value;
+    if(!dateVal) { alert("日付を入れてください"); return; }
+    let vitals = JSON.parse(localStorage.getItem("vitals")) || [];
+    let index = vitals.findIndex(v => v.date === dateVal);
+    let newEntry = {
+        date: dateVal,
+        amHigh: parseInt(document.getElementById("amHigh").value) || 0,
+        amLow: parseInt(document.getElementById("amLow").value) || 0,
+        pmHigh: parseInt(document.getElementById("pmHigh").value) || 0,
+        pmLow: parseInt(document.getElementById("pmLow").value) || 0,
+        weight: parseFloat(document.getElementById("weight").value) || 0
+    };
+    if (index !== -1) {
+        vitals[index] = newEntry;
+        alert("更新しました");
+    } else {
+        vitals.push(newEntry);
+        alert("保存しました");
+    }
+    localStorage.setItem("vitals", JSON.stringify(vitals));
+    showVitals();
+    drawGraph();
+    clearVitalInput(); // 保存後リセット
+}
+
+function deleteCurrentVital() {
+    let dateVal = document.getElementById("vitalDate").value;
+    if(!dateVal) { alert("日付を選択してください"); return; }
+    let vitals = JSON.parse(localStorage.getItem("vitals")) || [];
+    if(!vitals.find(v => v.date === dateVal)) { alert("データがありません"); return; }
+
+    if(confirm(dateVal + "のデータを削除しますか？")) {
+        vitals = vitals.filter(v => v.date !== dateVal);
+        localStorage.setItem("vitals", JSON.stringify(vitals));
+        showVitals();
+        drawGraph();
+        clearVitalInput(); // 削除後リセット
+        alert("削除しました");
+    }
+}
+
+function showVitals(){
+    let vitals = JSON.parse(localStorage.getItem("vitals")) || [];
+    vitals.sort((a,b)=> new Date(b.date) - new Date(a.date));
+    let html = "";
+    vitals.forEach((v)=>{
+        html+=`<div class="item">
+            <b>${v.date}</b> 朝:${v.amHigh}/${v.amLow} 夕:${v.pmHigh}/${v.pmLow} 体重:${v.weight}kg
+            <button onclick="deleteVital('${v.date}')">削除</button>
+        </div>`;
+    });
+    document.getElementById("vitalList").innerHTML = html;
+}
+
+function deleteVital(date){
+    if(!confirm(date + "のデータを削除しますか？")) return;
+    let vitals = JSON.parse(localStorage.getItem("vitals")) || [];
+    vitals = vitals.filter(v => v.date !== date);
+    localStorage.setItem("vitals", JSON.stringify(vitals));
+    showVitals();
+    drawGraph();
+}
+
+// --- [3] 視覚化 ---
+
+function drawSaltMeter(){
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    let today = new Date().toISOString().split("T")[0];
+    let total = 0;
+    meals.forEach(m => {
+        if(m.date === today) total += Number(m.salt);
+    });
+    let limit = 6; // 目標を6gに変更
+    let percent = (total / limit) * 100;
+    if(percent > 100) percent = 100;
+    
+    let bar = document.getElementById("saltBar");
+    bar.style.width = percent + "%";
+    
+    // 6g超えで赤、6g以内で青
+    if(total > limit) {
+        bar.style.backgroundColor = "#ff6666"; // 赤
+    } else {
+        bar.style.backgroundColor = "#337ab7"; // 青
+    }
+    
+    document.getElementById("saltText").innerHTML = 
+        `今日の合計: <span class="total-salt">${total.toFixed(1)}g</span> / 目標${limit}g以下`;
+}
+
+// グラフ期間の初期値セットと更新用
+function initGraphDates() {
+    let endDate = new Date();
+    let startDate = new Date();
+    startDate.setDate(endDate.getDate() - 13); // デフォルト2週間
+    
+    document.getElementById("graphEndDate").value = endDate.toISOString().split("T")[0];
+    document.getElementById("graphStartDate").value = startDate.toISOString().split("T")[0];
+}
+
+function updateGraphRange() {
+    drawGraph();
+}
+
+function drawGraph(){
+    let vitals = JSON.parse(localStorage.getItem("vitals")) || [];
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    
+    // 指定された期間を取得
+    let startStr = document.getElementById("graphStartDate").value;
+    let endStr = document.getElementById("graphEndDate").value;
+    
+    // 未設定の場合は初期値を設定
+    if (!startStr || !endStr) {
+        initGraphDates();
+        startStr = document.getElementById("graphStartDate").value;
+        endStr = document.getElementById("graphEndDate").value;
+    }
+    
+    let startDate = new Date(startStr);
+    let endDate = new Date(endStr);
+    
+    // 開始日が終了日より未来の場合は入れ替える
+    if (startDate > endDate) {
+        let temp = startDate;
+        startDate = endDate;
+        endDate = temp;
+        document.getElementById("graphStartDate").value = startDate.toISOString().split("T")[0];
+        document.getElementById("graphEndDate").value = endDate.toISOString().split("T")[0];
+    }
+    
+    // 期間の日数差を計算（最大でも直近の数百日程度を想定）
+    let diffTime = Math.abs(endDate - startDate);
+    let diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // 表示日数が多すぎるとグラフが潰れるので最大100日程度に制限
+    if (diffDays > 100) {
+        alert("表示期間が長すぎます。100日以内に制限されました。");
+        startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 99);
+        diffDays = 99;
+        document.getElementById("graphStartDate").value = startDate.toISOString().split("T")[0];
+    }
+    
+    let labels = [];
+    let bpAmData = [];
+    let bpPmData = [];
+    let saltData = [];
+    
+    let dailySalt = {};
+    meals.forEach(m => {
+        if(!dailySalt[m.date]) dailySalt[m.date] = 0;
+        dailySalt[m.date] += Number(m.salt);
+    });
+
+    // startDate から endDate まで1日ずつ進める
+    for(let i = 0; i <= diffDays; i++){
+        let d = new Date(startDate);
+        d.setDate(startDate.getDate() + i);
+        let y = d.getFullYear();
+        let m = ("0" + (d.getMonth() + 1)).slice(-2);
+        let day = ("0" + d.getDate()).slice(-2);
+        let dateStr = `${y}-${m}-${day}`;
+        let labelStr = `${m}/${day}`;
+        labels.push(labelStr);
+        
+        let v = vitals.find(v => v.date === dateStr);
+        if(v && v.amHigh && v.amLow) {
+            bpAmData.push([v.amLow, v.amHigh]);
+        } else {
+            bpAmData.push(null);
+        }
+        
+        if(v && v.pmHigh && v.pmLow) {
+            bpPmData.push([v.pmLow, v.pmHigh]);
+        } else {
+            bpPmData.push(null);
+        }
+        
+        saltData.push(dailySalt[dateStr] || 0);
+    }
+    
+    let ctx = document.getElementById("graphCanvas");
+    if(!ctx) {
+        document.getElementById("graph").innerHTML = '<canvas id="graphCanvas"></canvas>';
+        ctx = document.getElementById("graphCanvas");
+    }
+    
+    if(window.myChart) {
+        window.myChart.destroy();
+    }
+    
+    window.myChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: '塩分(g)',
+                    data: saltData,
+                    type: 'line',
+                    borderColor: '#ffb74d',
+                    backgroundColor: '#ffb74d',
+                    yAxisID: 'y-salt',
+                    tension: 0.3,
+                    borderWidth: 3,
+                    pointRadius: 4
+                },
+                {
+                    label: '朝血圧',
+                    data: bpAmData,
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y-bp',
+                    categoryPercentage: 0.8,
+                    barPercentage: 0.9
+                },
+                {
+                    label: '夕血圧',
+                    data: bpPmData,
+                    backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y-bp',
+                    categoryPercentage: 0.8,
+                    barPercentage: 0.9
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                'y-bp': {
+                    type: 'linear',
+                    position: 'left',
+                    min: 60,
+                    max: 200,
+                    title: { display: true, text: '血圧 (mmHg)' }
+                },
+                'y-salt': {
+                    type: 'linear',
+                    position: 'right',
+                    min: 0,
+                    max: 15,
+                    title: { display: true, text: '塩分 (g)' },
+                    grid: { drawOnChartArea: false }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            if(context.dataset.label === '塩分(g)') {
+                                return `塩分: ${context.parsed.y}g`;
+                            } else {
+                                const bp = context.raw;
+                                if(bp) {
+                                    return `${context.dataset.label}: ${bp[1]} / ${bp[0]}`;
+                                }
+                                return context.dataset.label + ': データなし';
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function clearAll(){
+    if(confirm("本当に全削除しますか？(食事も血圧も全て消えます)")){
+        localStorage.clear();
+        location.reload();
+    }
+}
+
+function injectTestData(){
+    if(!confirm("現在のデータに上書き・追加で3週間分のテストデータを入れますか？")) return;
+    
+    let meals = JSON.parse(localStorage.getItem("meals")) || [];
+    let vitals = JSON.parse(localStorage.getItem("vitals")) || [];
+    
+    let today = new Date();
+    for(let i=0; i<21; i++){
+        let d = new Date(today);
+        d.setDate(today.getDate() - i);
+        let y = d.getFullYear();
+        let m = ("0" + (d.getMonth() + 1)).slice(-2);
+        let day = ("0" + d.getDate()).slice(-2);
+        let dateStr = `${y}-${m}-${day}`;
+        
+        // 重複を避けるために同じ日付のデータは削除
+        meals = meals.filter(x => x.date !== dateStr);
+        vitals = vitals.filter(x => x.date !== dateStr);
+        
+        // 食事データの生成 (1日複数回に分割)
+        meals.push({
+            id: new Date().getTime() + Math.random(),
+            date: dateStr,
+            desc: "朝食（テスト）",
+            salt: Math.round((1 + Math.random() * 2) * 10) / 10
+        });
+        meals.push({
+            id: new Date().getTime() + Math.random(),
+            date: dateStr,
+            desc: "昼食（テスト）",
+            salt: Math.round((2 + Math.random() * 3) * 10) / 10
+        });
+        if(Math.random() > 0.5) {
+            meals.push({
+                id: new Date().getTime() + Math.random(),
+                date: dateStr,
+                desc: "夕食（テスト）",
+                salt: Math.round((2 + Math.random() * 3) * 10) / 10
+            });
+        }
+        
+        // 血圧・体重データの生成
+        vitals.push({
+            date: dateStr,
+            amHigh: Math.floor(110 + Math.random() * 30),
+            amLow: Math.floor(70 + Math.random() * 20),
+            pmHigh: Math.floor(115 + Math.random() * 25),
+            pmLow: Math.floor(75 + Math.random() * 15),
+            weight: Math.round((65 + Math.random() * 3) * 10) / 10
+        });
+    }
+    
+    localStorage.setItem("meals", JSON.stringify(meals));
+    localStorage.setItem("vitals", JSON.stringify(vitals));
+    
+    alert("3週間分のテストデータを挿入しました！一覧表示すると1日の複数入力も確認できます。");
+    location.reload();
+}
+
+window.onload = function() {
+    updateFoodDatalist();
+    initGraphDates();
+    drawSaltMeter();
+    drawGraph();
+};
+</script>
+</body>
+</html>
